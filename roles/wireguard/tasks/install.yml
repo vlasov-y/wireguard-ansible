@@ -1,0 +1,20 @@
+- name: "{{ network }} : Configure firewalld"
+  include_tasks: firewalld.yml
+  when: _firewalld_enabled.stdout|bool
+
+- name: "{{ network }} : Create keys"
+  include_tasks: keys.yml
+
+- name: "{{ network }} : Add route table"
+  become: yes
+  blockinfile:
+    marker: "# {mark} Table for wireguard network {{ network }}"
+    path: /etc/iproute2/rt_tables
+    block: "{{ rt_table.id }}    {{ rt_table.name }}"
+
+- name: "{{ network }} : Save configuration"
+  include_tasks: config_save.yml
+
+- name: "{{ network }} : Configure NetworkManager"
+  include_tasks: network_manager.yml
+  when: network in wireguard_proxy_domains

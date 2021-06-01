@@ -1,0 +1,80 @@
+#  ╻ ╻╻┏━┓┏━╸┏━╸╻ ╻┏━┓┏━┓╺┳┓
+#  ┃╻┃┃┣┳┛┣╸ ┃╺┓┃ ┃┣━┫┣┳┛ ┃┃
+#  ┗┻┛╹╹┗╸┗━╸┗━┛┗━┛╹ ╹╹┗╸╺┻┛
+
+# default
+wireguard_configuration_path: /etc/wireguard
+# skip all checks
+wireguard_skip_checks: no
+# installs wireguard-tools
+wireguard_install_tools: yes
+# interface name prefix
+wireguard_interface_name_prefix: wg
+# list of networks with their cidrs
+wireguard_networks: {}
+  # k3s: 10.0.0.0/24
+# ports to listen on
+wireguard_ports: {}
+  # k3s: 12345
+# force these keys
+wireguard_keys: {}
+  # k3s:
+  #   private: 'CFzvKwI2s0v7y72k8Btup+cryb8vuJcR9MFo10naH10='
+  #   public: 'bIMrAKJrQv5wCCB5y5Y5L3L6jNOTyXQ1TXfoefRRZgM='
+# list of preshared_keys - leave it empty please
+wireguard_preshared_keys: {}
+# force regenerate keys
+wireguard_regenerate_keys: []
+  # - k3s
+# will be applied to all peers by default (if set)
+wireguard_default_keepalive_seconds: no
+# list of peers
+wireguard_peers: {}
+  # k3s:
+  #   manual:
+  #     - public_key: ...
+  #       preshared_key: base64string
+  #       keepalive_seconds: 0 # for disable
+  #       allowed_ips:
+  #         - 0.0.0.0/0
+  #         - ::0
+  #       endpoint: ep.com
+  #   inventory:
+  #     - hostname: ...
+  #       endpoint: ep.com:1234
+# list of addresses for the interface
+wireguard_addresses: {}
+  # k3s: 10.0.0.1/24
+# optional override list for interfaces
+wireguard_interfaces: {}
+  # k3s: wgcutom0
+# optional list of strings for the networks
+wireguard_extra_config: {}
+  # k3s:
+  #   prestart:
+  #     - echo hello
+  #   poststart
+  #     - echo we are online
+  #   prestop:
+  #     - echo time to sleep
+  #   poststop:
+  #     - echo we are done
+# make server a VPN
+wireguard_masquarade: {}
+  # k3s: #eth0 or leave empty for default
+# fwmarks for interfaces networks
+wireguard_fwmarks: {}
+  # k3s: 134
+# proxy domains for these networks
+wireguard_rt_tables: {}
+  # k3s:
+  #   name: k3s-table
+  #   weight: 123
+# domains to proxy using dnsmasq and NetworkManager
+wireguard_proxy_domains: {}
+  # k3s:
+  #   list:
+  #   - yandex.ru
+  #   - vk.com
+  #   # fwmark: random # or 2134 or do not specify it
+  #   # ipset: myset

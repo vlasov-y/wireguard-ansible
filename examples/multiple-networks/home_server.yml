@@ -1,0 +1,11 @@
+wireguard_enabled: yes
+wireguard_peers:
+  home:
+    inventory:
+      - hostname: public_host
+        endpoint: home.example.com
+        allowed_ips:
+          - "{{ wireguard_networks.home }}"
+        keepalive_seconds: 25
+wireguard_addresses:
+  home: 10.0.0.3/24

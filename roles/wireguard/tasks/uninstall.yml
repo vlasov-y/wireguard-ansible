@@ -1,0 +1,13 @@
+- name: "{{ network }} : Stop wireguard@{{ network }}.service"
+  become: yes
+  systemd:
+    name: "wireguard@{{ network }}.service"
+    state: stopped
+    enabled: no
+    daemon_reload: yes
+
+- name: "{{ network }} : Remove network files"
+  become: yes
+  file:
+    path: "{{ wireguard_configuration_path }}/{{ network }}"
+    state: absent

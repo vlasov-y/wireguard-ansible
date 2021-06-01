@@ -1,0 +1,7 @@
+- name: "{{ network }} : Get random port"
+  get_free_port:
+  register: _random
+
+- name: "{{ network }} : Save port to wireguard_ports"
+  set_fact:
+    wireguard_ports: "{{ wireguard_ports | combine({network: _random.port}) }}"

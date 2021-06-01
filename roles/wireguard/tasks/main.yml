@@ -1,0 +1,55 @@
+- name: Set fact wireguard_attached_networks
+  set_fact:
+    wireguard_attached_networks: "{{ wireguard_addresses.keys() | list }}"
+  
+- when: wireguard_enabled|bool
+  block:
+    - name: Checks
+      include_tasks: checks.yml
+      when: not wireguard_skip_checks|bool
+
+    - name: Set facts
+      include_tasks: facts.yml
+
+    - name: Install wireguard-tools
+      become: yes
+      package:
+        name: wireguard-tools
+        state: latest
+      when: wireguard_install_tools|bool
+
+    - name: Allow IPv4 forwarding
+      become: yes
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        state: present
+        reload: yes
+      
+    - name: Get firewalld state
+      become: yes
+      shell: firewall-cmd --state | grep -q running && echo yes || echo no
+      changed_when: no
+      register: _firewalld_enabled
+
+    - name: Install wireguard
+      include_tasks: install.yml
+      loop: "{{ wireguard_attached_networks }}"
+      loop_control:
+        loop_var: network
+      vars:
+        configuration_path: "{{ wireguard_configuration_path }}/{{ network }}"
+        interface: "{{ wireguard_interfaces[network] }}"
+        port: "{{ wireguard_ports[network] | int }}"
+        fwmark: "{{ wireguard_fwmarks[network] }}"
+        peers: "{{ wireguard_peers[network] }}"
+        rt_table: "{{ wireguard_rt_tables[network] }}"
+        ipset: "{{ wireguard_proxy_domains[network].ipset | default(None) }}"
+        proxy_fwmark: "{{ wireguard_proxy_domains[network].fwmark | default(None) }}"
+
+- name: Uninstall wireguard
+  include_tasks: uninstall.yml
+  when: not wireguard_enabled|bool
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network

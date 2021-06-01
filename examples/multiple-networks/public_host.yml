@@ -1,0 +1,30 @@
+wireguard_enabled: yes
+wireguard_install_tools: no
+wireguard_peers:
+  home:
+    inventory:
+      - hostname: localhost
+      - hostname: home_server
+        keepalive_seconds: 25
+  vpn:
+    inventory:
+      - hostname: localhost
+    manual:
+      - name: Redmi Note 7
+        public_key: e4Ryxp2/j0bPRZvCDhqZ+FHLf/XIsWMcodNPBOIuTwI=
+        preshared_key: rnVugG3bCwPCyg73C9pavNQ/0B4I9gPnN1zD0Gd35zI=
+        allowed_ips:
+          - 10.0.0.10/32
+wireguard_addresses:
+  home: 10.0.0.1/24
+  vpn: 10.0.1.1/24
+wireguard_ports:
+  home: 2000
+  vpn: 3000
+wireguard_masquarade:
+  vpn: auto
+wireguard_keys:
+  vpn: 
+    private: EHWmPnjglykitb51N3GKb55KdfRCSL/Cutx0dWa4h3g=
+    public: X/RwXVxg7HkEK73icJwWOwT/K8CaKRyFNZqocM8ToAc=
+

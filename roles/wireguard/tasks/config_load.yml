@@ -1,0 +1,24 @@
+- name: "{{ network }} : Get config stat"
+  become: yes
+  stat:
+    path: "{{ config_path }}"
+  register: _config
+
+- when: _config.stat.exists
+  block:
+    - name: "{{ network }} : Read config"
+      become: yes
+      shell: "cat '{{ config_path }}'"
+      register: _content
+      changed_when: no
+
+    - name: "{{ network }} : Set facts from config"
+      set_fact:
+        wireguard_ports: "{{ {network: yaml['port']} | combine(wireguard_ports) }}"
+        wireguard_keys: "{{ {network: {'public': yaml['public'], 'private': yaml['private']}} | combine(wireguard_keys, recursive=True) }}"
+        wireguard_preshared_keys: "{{ yaml['preshared_keys'] | default({}) | combine(wireguard_preshared_keys) }}"
+        wireguard_rt_tables: "{{ {network: yaml['rt_table']} | combine(wireguard_rt_tables) if 'rt_table' in yaml else wireguard_rt_tables }}"
+        wireguard_fwmarks: "{{ {network: yaml['fwmark']} | combine(wireguard_fwmarks) if 'fwmark' in yaml else wireguard_fwmarks }}"
+        wireguard_proxy_domains: "{{ {network: {'ipset': yaml['ipset']|default(None), 'fwmark': yaml['proxy_fwmark']|default(None)}} | combine(wireguard_proxy_domains, recursive=True) if network in wireguard_proxy_domains else wireguard_proxy_domains }}"
+      vars:
+        yaml: "{{ _content.stdout | from_yaml }}"

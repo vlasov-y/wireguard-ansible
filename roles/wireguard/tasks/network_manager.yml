@@ -1,0 +1,66 @@
+- name: Check NetworkManager installed
+  become: yes
+  shell: NetworkManager -V 1>/dev/null && echo yes || echo no
+  changed_when: no
+  register: _check
+
+- name: Fail if no NetworkManager
+  fail:
+    msg: "NetworkManager is not installed"
+  when: not _check.stdout|bool
+
+- name: Install ipset
+  become: yes
+  package:
+    name: ipset
+    state: present
+
+- name: Update dnsmasq.conf
+  become: yes
+  copy:
+    dest: "/etc/NetworkManager/dnsmasq.d/{{ network }}.conf"
+    content: |
+      ipset=/{{ wireguard_proxy_domains[network].list | join('/') }}/{{ ipset }}
+  register: _config_update
+
+- name: List dnsmasq confs
+  become: yes
+  find:
+    paths:
+      - /etc/NetworkManager/dnsmasq.d/
+    use_regex: yes
+    patterns: '^.+\.conf$'
+  register: _find
+
+- name: Clean dnsmasq.conf
+  become: yes
+  lineinfile:
+    dest: "{{ path }}"
+    regexp: "{{ regexp }}"
+    state: absent
+  register: _config_clean
+  loop: "{{ _find | json_query(query) | list }}"
+  loop_control:
+    loop_var: path
+  vars:
+    query: "files[*].path|[]"
+    regexp: "^ipset=({% for domain in wireguard_proxy_domains[network].list %}{{ '.*/' + domain | regex_replace('\\.', '\\.') + '/.*' }}{{ '|' if not loop.last }}{% endfor %})$"
+  when: path is not match('/etc/NetworkManager/dnsmasq.d/' + network + '.conf')
+
+- name: Enable dnsmasq for NetworkManager
+  become: yes
+  copy:
+    dest: /etc/NetworkManager/conf.d/dnsmasq.conf
+    mode: 0644
+    content: |
+      [main]
+      dns=dnsmasq
+  register: _dnsmasq
+
+- name: Restart/Start NetworkManager.service
+  become: yes
+  systemd:
+    name: NetworkManager.service
+    state: "{{ 'restarted' if _config_update.changed or True in _config_clean|json_query('results[*].changed|[]') or _dnsmasq.changed else 'started' }}"
+    enabled: yes
+    daemon_reload: no

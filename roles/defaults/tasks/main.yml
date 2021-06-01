@@ -1,0 +1,7 @@
+- name: Get distro info
+  get_distro:
+  register: distro
+
+- name: Set facts
+  set_fact:
+    internal_ip: "{{ internal_ip | default(ansible_host) }}"

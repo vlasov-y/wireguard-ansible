@@ -1,0 +1,188 @@
+- name: Check wireguard_interface_name_prefix
+  fail:
+    msg: "wireguard_interface_name_prefix have to start with wg"
+  when: wireguard_interface_name_prefix is not match('^wg')
+
+- name: Check wireguard_preshared_keys
+  fail:
+    msg: "Do not overwrite wireguard_preshared_keys"
+  when: wireguard_preshared_keys != {}
+
+- name: Check no peers
+  fail:
+    msg: "No peers defined"
+  when: wireguard_peers is not defined or not wireguard_peers 
+
+- name: Check no addresses
+  fail:
+    msg: "No addresses defined"
+  when: wireguard_addresses is not defined or not wireguard_addresses
+
+- name: Check unknown networks in wireguard_regenerate_keys
+  fail:
+    msg: "Unknown network {{ network }} in wireguard_regenerate_keys"
+  loop: "{{ wireguard_regenerate_keys }}"
+  loop_control:
+    loop_var: network
+  when: network not in wireguard_networks.keys()
+
+- name: Check unknown networks in wireguard_peers
+  fail:
+    msg: "Unknown network {{ network }} in wireguard_peers"
+  loop: "{{ wireguard_peers.keys() | list }}"
+  loop_control:
+    loop_var: network
+  when: network not in wireguard_networks.keys()
+
+- name: Check unknown networks in wireguard_addresses
+  fail:
+    msg: "Unknown network {{ network }} in wireguard_addresses"
+  loop: "{{ wireguard_addresses.keys() | list }}"
+  loop_control:
+    loop_var: network
+  when: network not in wireguard_networks.keys()
+
+- name: Check unknown networks in wireguard_interfaces
+  fail:
+    msg: "Unknown network {{ network }} in wireguard_interfaces"
+  loop: "{{ wireguard_interfaces.keys() | list }}"
+  loop_control:
+    loop_var: network
+  when: network not in wireguard_networks.keys()
+
+- name: Check address subnet
+  fail:
+    msg: "Address {{ address }} does not belong to subnet {{ subnet }}"
+  loop: "{{ wireguard_addresses | dict2items }}"
+  loop_control:
+    label: "{{ network }} > {{ address }}"
+  vars:
+    network: "{{ item.key }}"
+    address: "{{ item.value }}"
+    subnet: "{{ wireguard_networks[network] }}"
+  when: not address | ipaddr(subnet)
+
+- name: Check address duplicates
+  fail:
+    msg: "Address {{ address }} is also assigned to another host in the network {{ network }}"
+  loop: "{{ wireguard_addresses | dict2items }}"
+  loop_control:
+    label: "{{ network }} > {{ address }}"
+  vars:
+    network: "{{ item.key }}"
+    address: "{{ item.value }}"
+    query: "*|[?inventory_hostname!=`{{ inventory_hostname }}`].wireguard_addresses.{{ network }}"
+  when: address in hostvars | json_query(query)
+
+- name: Check inventory peers connections
+  fail:
+    msg: "{{ check | from_yaml }}"
+  loop: "{{ wireguard_peers | dict2items }}"
+  loop_control:
+    label: "{{ network }}"
+  vars:
+    network: "{{ item.key }}"
+    peers: "{{ item.value | json_query('not_null(inventory, `[]`)[*].hostname') | default([]) }}"
+    check: |
+      {% set query = 'not_null(wireguard_peers.'+network+'.not_null(inventory, `[]`)[*].hostname, `[]`)' %}
+      {% set errors = [] %}
+      {% for host in peers %}
+      {% if inventory_hostname not in hostvars[host] | json_query(query) %}
+      {{ errors.append('Peer ' + host + ' does not have ' + inventory_hostname + ' in inventory peers') }}
+      {% endif %}
+      {% endfor %}
+      {{ errors | list | to_yaml }}
+  when: check | from_yaml
+
+- name: Check manual peers
+  fail:
+    msg: "{{ check | from_yaml }}"
+  loop: "{{ wireguard_peers | dict2items }}"
+  loop_control:
+    label: "{{ network }}"
+  vars:
+    network: "{{ item.key }}"
+    peers: "{{ item.value | json_query('not_null(manual, `[]`)') }}"
+    check: |
+      {% set errors = [] %}
+      {% for peer in peers %}
+      {% if peer.endpoint is defined and peer.endpoint is not match(':[0-9]+$') %}
+        {{ errors.append('Peer ' + peer + ' in the networks ' + network + ' does not have endpoint port specified') }}
+      {% elif peer.public_key is not defined %}
+        {{ errors.append('Peer ' + peer + ' in the networks ' + network + ' does not have public_key defined') }}
+      {% elif peer.allowed_ips is not defined %}
+        {{ errors.append('Peer ' + peer + ' in the networks ' + network + ' does not have allowed_ips defined') }}
+      {% elif peer.preshared_key is not defined %}
+        {{ errors.append('Peer ' + peer + ' in the networks ' + network + ' does not have preshared_key defined') }}
+      {% endif %}
+      {% endfor %}
+      {{ errors | list | to_yaml }}
+  when: check | from_yaml
+
+- name: Check wireguard_ports
+  fail:
+    msg: "Wireguard cannot listen on {{ port }} for network {{ network }}"
+  loop: "{{ wireguard_ports | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}/{{ item.value }}"
+  vars:
+    network: "{{ item.key }}"
+    port: "{{ item.value }}"
+  when:
+    - port|string != 'random'
+    - (port|int < 1) or (port|int > 65535)
+
+- name: Check wireguard_fwmarks
+  fail:
+    msg: "Improper fwmark {{ fwmark }} for network {{ network }}"
+  loop: "{{ wireguard_fwmarks | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}/{{ item.value }}"
+  vars:
+    network: "{{ item.key }}"
+    fwmark: "{{ item.value }}"
+  when:
+    - fwmark|string != 'random'
+    - (fwmark|int < 1) or (fwmark|int > 65535)
+
+- name: Check wireguard_ports duplicates
+  fail:
+    msg: "wireguard_ports has duplicates"
+  when: full|length != uniq|length
+  vars:
+    full: "{{ wireguard_ports.values() | difference(['random']) | list }}"
+    uniq: "{{ full | unique }}"
+
+- name: Check wireguard_fwmarks duplicates
+  fail:
+    msg: "wireguard_fwmarks has duplicates"
+  when: full|length != uniq|length
+  vars:
+    full: "{{ wireguard_fwmarks.values() | difference(['random']) | list }}"
+    uniq: "{{ full | unique }}"
+
+- name: Check wireguard_keys
+  fail:
+    msg: "Wireguard keys for network {{ network }} are not set properly"
+  loop: "{{ wireguard_keys | dict2items }}"
+  loop_control:
+    label: "{{ network }}"
+  vars:
+    network: "{{ item.key }}"
+    public: "{{ item.value.public | default(None) }}"
+    private: "{{ item.value.private | default(None) }}"
+  when: not public or not private
+
+- name: Check wireguard_rt_tables
+  fail:
+    msg: "wireguard_rt_tables id for network {{ network }} cannot be set to {{ id }}"
+  loop: "{{ wireguard_rt_tables | dict2items }}"
+  loop_control:
+    label: "{{ network }}" 
+  when: 
+    - id|string != 'random'
+    - (id|int < 1) or (id|int > 252)
+  vars:
+    network: "{{ item.key }}"
+    name: "{{ item.value.name | default(None) }}"
+    id: "{{ item.value.id | default(None) }}"

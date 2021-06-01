@@ -1,0 +1,35 @@
+- name: "{{ network }} : Process preshared keys for peers"
+  include_tasks: preshared.yml
+  vars:
+    _: |
+      {% for host in groups['all'] %}
+      - {{ host if host in [inventory_hostname, peer.hostname] }}
+      {% endfor %}
+    primary_peer: "{{ (_ | from_yaml)[0] }}"
+    secondary_peer: "{{ (_ | from_yaml)[1] }}"
+    preshared_key_name: "{{ [inventory_hostname, peer.hostname, network] | sort | hash('md5') }}"
+  loop: "{{ peers.inventory | default([]) }}"
+  loop_control:
+    loop_var: peer
+
+- when: (network not in wireguard_keys) or
+        (network in wireguard_regenerate_keys)
+  block:
+    - name: "{{ network }} : Generate new keys"
+      become: yes
+      shell: |
+        PRIVATE="$(wg genkey)"
+        PUBLIC="$(printf "$PRIVATE" | wg pubkey)"
+        printf "private: '%s'\npublic: '%s'" "$PRIVATE" "$PUBLIC"
+      register: _keys
+
+    - name: "{{ network }} : Set fact wireguard_keys"
+      set_fact:
+        wireguard_keys: "{{ wireguard_keys | combine({network: {'public': public, 'private': private}}) }}"
+      vars:
+        public: "{{ _keys.stdout | from_yaml | json_query('public') }}"
+        private: "{{ _keys.stdout | from_yaml | json_query('private') }}"
+
+- name: "{{ network }} : Print public keys"
+  debug:
+    msg: "{{ wireguard_keys | json_query(network + '.public') }}"

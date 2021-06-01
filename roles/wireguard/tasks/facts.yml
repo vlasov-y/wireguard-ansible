@@ -1,0 +1,141 @@
+- name: Read existing configs
+  include_tasks: config_load.yml
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  vars:
+    config_path: "{{ wireguard_configuration_path }}/{{ network }}/settings.yaml"
+
+- name: Set fact wireguard_interfaces
+  set_fact:
+    wireguard_interfaces: "{{ {network: name} | combine(wireguard_interfaces) }}"
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  vars:
+    name: "{{ wireguard_interface_name_prefix }}-{{ network }}"
+
+- name: Select ports
+  include_tasks: ports.yml
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  when: (network not in wireguard_ports) or
+        (wireguard_ports[network] == 'random')
+
+- name: Select random fwmarks for wireguard interfaces
+  set_fact:
+    wireguard_fwmarks: "{{ wireguard_fwmarks | combine({network: fwmark}) }}"
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  when: network not in wireguard_fwmarks or
+        network in wireguard_fwmarks and wireguard_fwmarks[network] == 'random'
+  vars:
+    seed: "{{ inventory_hostname + network + lookup('pipe', 'date -Ins')|string }}"
+    fwmark: "{{ 65536 | random(start=1, seed=seed) }}"
+  failed_when: wireguard_fwmarks.values() | intersect([fwmark]) | length > 1
+  retries: 10
+  delay: 0
+  until: _ is succeeded
+  register: _
+
+- name: Select random fwmarks for dnsmasq
+  set_fact:
+    wireguard_proxy_domains: "{{ wireguard_proxy_domains | combine({network: {'fwmark': fwmark}}) }}"
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  when: 
+    - network in wireguard_proxy_domains
+    - wireguard_proxy_domains[network].fwmark is not defined or
+      not wireguard_proxy_domains[network].fwmark or
+      wireguard_proxy_domains[network].fwmark == 'random'
+  vars:
+    seed: "{{ inventory_hostname + network + lookup('pipe', 'date -Ins')|string }}"
+    fwmark: "{{ 65536 | random(start=1, seed=seed) }}"
+  failed_when: (wireguard_proxy_domains | json_query('*.fwmark') | list + wireguard_fwmarks.values() | list) | intersect([fwmark]) | length > 1
+  retries: 10
+  delay: 0
+  until: _ is succeeded
+  register: _
+
+- name: Convert wireguard interfaces fwmarks to hex
+  set_fact:
+    wireguard_fwmarks: "{{ wireguard_fwmarks | combine({network: fwmark}) }}"
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  when: wireguard_fwmarks[network]|string is not match('^0x')
+  vars:
+    fwmark: "{{ '%#x' % wireguard_fwmarks[network]|int }}"
+
+- name: Convert dnsmasq fwmarks to hex
+  set_fact:
+    wireguard_proxy_domains: "{{ wireguard_proxy_domains | combine({network: {'fwmark': fwmark}}, recursive=True) }}"
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  when:
+    - network in wireguard_proxy_domains
+    - wireguard_proxy_domains[network].fwmark|string is not match('^0x')
+  vars:
+    fwmark: "{{ '%#x' % wireguard_proxy_domains[network].fwmark|int }}"
+
+- name: List route tables ids
+  shell: |
+    grep -E '^[0-9]' /etc/iproute2/rt_tables | while read -r W N; do printf "'$N': $W\n"; done
+  changed_when: no
+  register: _rt_tables
+
+- name: Set fact rt_tables
+  set_fact:
+    rt_tables: "{{ _rt_tables.stdout | from_yaml }}"
+
+- name: Update fact wireguard_rt_tables with random IDs
+  set_fact:
+    wireguard_rt_tables: "{{ wireguard_rt_tables | combine({network: {'name': name, 'id': id|int}}) }}"
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  when: network not in wireguard_rt_tables or
+        network in wireguard_rt_tables and
+        (wireguard_rt_tables[network].id == 'random' or not wireguard_rt_tables[network].id)
+  vars:
+    query: "not_null({{ network }}.name, `{{ wireguard_interfaces[network] }}`)"
+    name: "{{ wireguard_rt_tables | json_query(query) }}"
+    seed: "{{ inventory_hostname + network + lookup('pipe', 'date -Ins')|string }}"
+    id: "{{ 252 | random(start=1, seed=seed) }}"
+  register: _
+  failed_when: id in rt_tables.values()|list
+  retries: 10
+  delay: 0
+  until: _ is succeeded
+
+- name: Fail if rt_table_id is in use
+  fail:
+    msg: "ID for table {{ name }} is already in use by table {{ rt_tables | dict2items | json_query(query) }}"
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  when:
+    - id in rt_tables.values()
+    - (name not in rt_tables) or
+      (id != rt_tables[name])
+  vars:
+    name: "{{ wireguard_rt_tables[network].name }}"
+    id: "{{ wireguard_rt_tables[network].id }}"
+    query: "[?value==`{{ id }}`].key"
+  
+- name: Set ipset_names in wireguard_proxy_domains
+  set_fact:
+    wireguard_proxy_domains: "{{ wireguard_proxy_domains | combine({network: {'ipset': name}}, recursive=True) }}"
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  vars:
+    name: "{{ wireguard_interfaces[network] }}"
+  when:
+    - network in wireguard_proxy_domains
+    - (wireguard_proxy_domains[network].ipset is not defined) or
+      (not wireguard_proxy_domains[network].ipset)

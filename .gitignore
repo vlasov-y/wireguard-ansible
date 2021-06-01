@@ -1,0 +1,6 @@
+plugins
+group_vars
+host_vars
+dist
+ansible.log
+inventory.yml

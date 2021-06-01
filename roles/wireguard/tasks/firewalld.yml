@@ -1,0 +1,53 @@
+- name: "{{ network }} : Get list of services"
+  become: yes
+  shell: firewall-cmd --get-services | sed -r 's/\s+/\n- /g; s/^/- /g'
+  changed_when: no
+  register: _services
+
+- name: "{{ network }} : Create service"
+  become: yes
+  shell: "firewall-cmd --new-service={{ interface }} --permanent"
+  when: interface not in _services.stdout | from_yaml
+
+- name: "{{ network }} : Get list of service ports"
+  become: yes
+  shell: |
+    firewall-cmd --permanent --service={{ interface }} --get-ports | sed -r 's/\s+/\n/g'
+  changed_when: no
+  register: _ports
+
+- name: "{{ network }} : Remove ports"
+  become: yes
+  shell: "firewall-cmd --permanent --service={{ interface }} --remove-port={{ p }}"
+  when:
+    - p is not match(port|string)
+    - p | length > 0
+  loop: "{{ _ports.stdout_lines }}"
+  loop_control:
+    loop_var: p
+  register: _remove
+
+- name: "{{ network }} : Add port {{ port }}"
+  become: yes
+  shell: "firewall-cmd --permanent --service={{ interface }} --add-port={{ port }}/udp"
+  when: (port|string + '/udp') not in _ports.stdout_lines
+  register: _add
+
+- name: "{{ network }} : List services in public zone"
+  become: yes
+  shell: firewall-cmd --list-services --zone=public | sed -r 's/\s+/\n- /g; s/^/- /g'
+  changed_when: no
+  register: _services
+
+- name: "{{ network }} : Add service to zone"
+  become: yes
+  shell: "firewall-cmd --zone=public --add-service={{ interface }} --permanent"
+  when: interface not in _services.stdout | from_yaml
+  register: _service 
+
+- name: "{{ network }} : Reload firewalld"
+  become: yes
+  shell: firewall-cmd --reload
+  when: (_add.changed) or 
+        (_service.changed) or
+        (True in _remove|json_query('results[*].changed'))
