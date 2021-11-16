@@ -1,20 +1,3 @@
-- name: Check NetworkManager installed
-  become: yes
-  shell: NetworkManager -V 1>/dev/null && echo yes || echo no
-  changed_when: no
-  register: _check
-
-- name: Fail if no NetworkManager
-  fail:
-    msg: "NetworkManager is not installed"
-  when: not _check.stdout|bool
-
-- name: Install ipset
-  become: yes
-  package:
-    name: ipset
-    state: present
-
 - name: Update dnsmasq.conf
   become: yes
   copy:

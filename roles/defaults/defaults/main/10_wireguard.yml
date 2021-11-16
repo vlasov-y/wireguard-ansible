@@ -21,8 +21,8 @@ wireguard_keys: {}
   # k3s:
   #   private: 'CFzvKwI2s0v7y72k8Btup+cryb8vuJcR9MFo10naH10='
   #   public: 'bIMrAKJrQv5wCCB5y5Y5L3L6jNOTyXQ1TXfoefRRZgM='
-# list of preshared_keys - leave it empty please
-wireguard_preshared_keys: {}
+# list of preshared_key - you can set additional preshared key
+wireguard_preshared_key: ""
 # force regenerate keys
 wireguard_regenerate_keys: []
   # - k3s
@@ -73,6 +73,7 @@ wireguard_rt_tables: {}
 # domains to proxy using dnsmasq and NetworkManager
 wireguard_proxy_domains: {}
   # k3s:
+  #   # force_bash_resolver: yes
   #   list:
   #   - yandex.ru
   #   - vk.com

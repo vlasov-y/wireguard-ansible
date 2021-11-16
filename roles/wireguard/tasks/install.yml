@@ -15,6 +15,6 @@
 - name: "{{ network }} : Save configuration"
   include_tasks: config_save.yml
 
-- name: "{{ network }} : Configure NetworkManager"
-  include_tasks: network_manager.yml
+- name: "{{ network }} : Proxy domains configuration"
+  include_tasks: proxy.yml
   when: network in wireguard_proxy_domains

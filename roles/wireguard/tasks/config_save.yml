@@ -17,7 +17,7 @@
       port: "{{ port }}"
       private: "{{ wireguard_keys[network].private }}"
       public: "{{ wireguard_keys[network].public }}"
-      preshared_keys: "{{ wireguard_preshared_keys }}"
+      preshared_key: "{{ wireguard_preshared_key }}"
       fwmark: "{{ fwmark }}"
       rt_table: "{{ rt_table }}"
       ipset: "{{ ipset }}"
@@ -40,40 +40,6 @@
   register: _script_new
   changed_when: no
 
-- name: "{{ network }} : Get old script stat"
-  become: yes
-  stat:
-    path: "{{ configuration_path }}/service.sh"
-  register: _script_old
-
-- when:
-    - _script_old.stat.exists
-    - _script_old.stat.checksum != _script_new.checksum
-  block:
-    - name: "{{ network }} : Stop wireguard interface"
-      become: yes
-      systemd:
-        name: "wireguard@{{ network }}.service"
-        enabled: yes
-        state: stopped
-    
-- name: "{{ network }} : Replace old script with the new one"
-  become: yes
-  copy:
-    remote_src: yes
-    src: "{{ configuration_path }}/service.sh.new"
-    dest: "{{ configuration_path }}/service.sh"
-    mode: 0755
-    owner: root
-    group: root
-    
-- name: "{{ network }} : Remove new script template file"
-  become: yes
-  file:
-    path: "{{ configuration_path }}/service.sh.new"
-    state: absent
-  changed_when: no
-
 - name: "{{ network }} : Generate systemd service"
   become: yes
   template:
@@ -82,13 +48,18 @@
     mode: 0644
   register: _service
 
+- name: "{{ network }} : Get old script stat"
+  become: yes
+  stat:
+    path: "{{ configuration_path }}/service.sh"
+  register: _script_old
+
 - name: "{{ network }} : Set fact _restart_required"
   set_fact:
     _restart_required: yes
   when: _wireguard.changed or
         _service.changed or
-        _settings.changed or
-        (_script_old.stat.exists and _script_old.stat.checksum != _script_new.checksum)
+        _settings.changed
 
 - name: "{{ network }} : {{ 'Restart' if _restart_required is defined else 'Start' }} wireguard interface"
   become: yes
@@ -97,3 +68,16 @@
     enabled: yes
     state: "{{ 're' if _restart_required is defined }}started"
     daemon_reload: yes
+  when:
+    - not (_script_old.stat.exists and _script_old.stat.checksum != _script_new.checksum)
+
+- name: "{{ network }} : Restart wireguard interface with script replacement"
+  become: yes
+  shell: |
+    systemctl stop 'wireguard@{{ network }}.service'
+    mv service.sh.new service.sh
+    systemctl enable --now 'wireguard@{{ network }}.service'
+  args:
+    chdir: "{{ configuration_path }}"
+  when:
+    - _script_old.stat.exists and _script_old.stat.checksum != _script_new.checksum

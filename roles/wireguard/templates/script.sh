@@ -14,7 +14,8 @@ RT_ID='{{ rt_table.id }}'
 # interface that is used in default route
 GW_IF="$(awk '$2 == 00000000 { print $1 }' /proc/net/route)"
 {%- if network in wireguard_proxy_domains %}
-PROXY_IPSET='{{ ipset }}'
+PROXY_IPSET_v4='{{ ipset }}-v4'
+PROXY_IPSET_v6='{{ ipset }}-v6'
 PROXY_FWMARK='{{ proxy_fwmark }}'
 {%- endif %}
 
@@ -70,11 +71,11 @@ _iproute() {
 # creates or destroys iphash ipset
 _ipset() {
   ACTION="$1"
-  shift 1
-  IPSET="$1"
-  IPSET_EXISTS="$(ipset list "$IPSET" | grep -qE ".+" && echo "true" || echo "false")"
+  IPSET="$2"
+  FAMILY="$3"
+  IPSET_EXISTS="$(ipset list "$IPSET" | grep -qE '.+' && echo "true" || echo "false")"
   if [ "$ACTION" = 'add' ] && ! $IPSET_EXISTS; then
-    ipset create "$IPSET" iphash
+    ipset create "$IPSET" iphash family "$FAMILY"
   elif [ "$ACTION" = 'del' ] && $IPSET_EXISTS; then
     ipset destroy "$IPSET"
   fi
@@ -136,9 +137,11 @@ disable_masquarade() {
 # enables domain-based proxying over wireguard
 enable_proxy() {
   # create ipset for dnsmasq
-  _ipset add "$PROXY_IPSET"
+  _ipset add "$PROXY_IPSET_v4" inet
+  _ipset add "$PROXY_IPSET_v6" inet6
   # mark IPs from ipset with mark $PROXY_FWMARK
-  iptables -t mangle -I OUTPUT -m set --match-set "$PROXY_IPSET" dst -j MARK --set-mark "$PROXY_FWMARK"
+  iptables -t mangle -I OUTPUT -m set --match-set "$PROXY_IPSET_v4" dst -j MARK --set-mark "$PROXY_FWMARK"
+  ip6tables -t mangle -I OUTPUT -m set --match-set "$PROXY_IPSET_v6" dst -j MARK --set-mark "$PROXY_FWMARK"
   # forward packets with mark $PROXY_FWMARK over wireguard's table
   _iprule add fwmark "$PROXY_FWMARK" table "$RT_NAME"
 }
@@ -146,7 +149,8 @@ enable_proxy() {
 # disables domain-based proxying over wireguard
 disable_proxy() {
   # disable marking
-  iptables -t mangle -D OUTPUT -m set --match-set "$PROXY_IPSET" dst -j MARK --set-mark "$PROXY_FWMARK"
+  iptables -t mangle -D OUTPUT -m set --match-set "$PROXY_IPSET_v4" dst -j MARK --set-mark "$PROXY_FWMARK"
+  ip6tables -t mangle -D OUTPUT -m set --match-set "$PROXY_IPSET_v6" dst -j MARK --set-mark "$PROXY_FWMARK"
   # remove rule for routing over wireguard network
   _iprule del fwmark "$PROXY_FWMARK" table "$RT_NAME"
   # remove ipset itself

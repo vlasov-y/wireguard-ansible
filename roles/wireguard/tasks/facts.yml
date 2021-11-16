@@ -139,3 +139,24 @@
     - network in wireguard_proxy_domains
     - (wireguard_proxy_domains[network].ipset is not defined) or
       (not wireguard_proxy_domains[network].ipset)
+
+- name: Set force_bash_resolver in wireguard_proxy_domains
+  set_fact:
+    wireguard_proxy_domains: "{{ wireguard_proxy_domains | combine({network: {'force_bash_resolver': False}}, recursive=True) }}"
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  vars:
+    name: "{{ wireguard_interfaces[network] }}"
+  when:
+    - network in wireguard_proxy_domains
+    - wireguard_proxy_domains[network].force_bash_resolver is not defined
+
+- name: Force keys regeneration if they are empty (from config file)
+  set_fact:
+    wireguard_regenerate_keys: "{{ wireguard_regenerate_keys | combine(network) }}"
+  loop: "{{ wireguard_attached_networks }}"
+  loop_control:
+    loop_var: network
+  when: (not wireguard_keys[network].public) or
+        (not wireguard_keys[network].private)

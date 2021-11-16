@@ -19,7 +19,7 @@ description:
 options:
 
 author:
-    - Yurii Vlasov (@y.vlasov)
+    - Yurii Vlasov (yuriy@vlasov.pro)
 '''
 
 EXAMPLES = '''

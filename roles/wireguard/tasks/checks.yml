@@ -3,11 +3,6 @@
     msg: "wireguard_interface_name_prefix have to start with wg"
   when: wireguard_interface_name_prefix is not match('^wg')
 
-- name: Check wireguard_preshared_keys
-  fail:
-    msg: "Do not overwrite wireguard_preshared_keys"
-  when: wireguard_preshared_keys != {}
-
 - name: Check no peers
   fail:
     msg: "No peers defined"

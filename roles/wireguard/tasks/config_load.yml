@@ -16,7 +16,7 @@
       set_fact:
         wireguard_ports: "{{ {network: yaml['port']} | combine(wireguard_ports) }}"
         wireguard_keys: "{{ {network: {'public': yaml['public'], 'private': yaml['private']}} | combine(wireguard_keys, recursive=True) }}"
-        wireguard_preshared_keys: "{{ yaml['preshared_keys'] | default({}) | combine(wireguard_preshared_keys) }}"
+        wireguard_preshared_key: "{{ yaml['preshared_key'] if 'preshared_key' in yaml else wireguard_preshared_key }}"
         wireguard_rt_tables: "{{ {network: yaml['rt_table']} | combine(wireguard_rt_tables) if 'rt_table' in yaml else wireguard_rt_tables }}"
         wireguard_fwmarks: "{{ {network: yaml['fwmark']} | combine(wireguard_fwmarks) if 'fwmark' in yaml else wireguard_fwmarks }}"
         wireguard_proxy_domains: "{{ {network: {'ipset': yaml['ipset']|default(None), 'fwmark': yaml['proxy_fwmark']|default(None)}} | combine(wireguard_proxy_domains, recursive=True) if network in wireguard_proxy_domains else wireguard_proxy_domains }}"

@@ -1,16 +1,16 @@
-- name: "{{ network }} : Process preshared keys for peers"
-  include_tasks: preshared.yml
-  vars:
-    _: |
-      {% for host in groups['all'] %}
-      - {{ host if host in [inventory_hostname, peer.hostname] }}
-      {% endfor %}
-    primary_peer: "{{ (_ | from_yaml)[0] }}"
-    secondary_peer: "{{ (_ | from_yaml)[1] }}"
-    preshared_key_name: "{{ [inventory_hostname, peer.hostname, network] | sort | hash('md5') }}"
-  loop: "{{ peers.inventory | default([]) }}"
-  loop_control:
-    loop_var: peer
+- name: "Generate preshared key"
+  block:
+    - name: "Generate new preshared key"
+      become: yes
+      shell: wg genpsk
+      register: _new_preshared_key
+      
+    - name: "Set fact wireguard_preshared_key"
+      set_fact:
+        wireguard_preshared_key: "{{ _new_preshared_key.stdout }}"
+  when: (network in wireguard_regenerate_keys) or
+        (not wireguard_preshared_key)
+  run_once: yes
 
 - when: (network not in wireguard_keys) or
         (network in wireguard_regenerate_keys)
