@@ -154,9 +154,10 @@
 
 - name: Force keys regeneration if they are empty (from config file)
   set_fact:
-    wireguard_regenerate_keys: "{{ wireguard_regenerate_keys | combine(network) }}"
+    wireguard_regenerate_keys: "{{ ((wireguard_regenerate_keys | default(list)) + [network]) | unique }}"
   loop: "{{ wireguard_attached_networks }}"
   loop_control:
     loop_var: network
-  when: (not wireguard_keys[network].public) or
+  when: (network not in wireguard_keys) or
+        (not wireguard_keys[network].public) or
         (not wireguard_keys[network].private)

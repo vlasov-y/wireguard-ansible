@@ -51,6 +51,10 @@ _iprule() {
   RULE_EXISTS="$(ip rule list "$@" | grep -qE ".+" && echo "true" || echo "false")"
   if [ "$ACTION" = 'add' ] && ! $RULE_EXISTS; then
     ip rule add "$@"
+    if ! ip rule list "$@" | grep -qE ".+"; then
+      echo "Failed to create the rule for $@"
+      exit 1
+    fi
   elif [ "$ACTION" = 'del' ] && $RULE_EXISTS; then
     ip rule del "$@"
   fi

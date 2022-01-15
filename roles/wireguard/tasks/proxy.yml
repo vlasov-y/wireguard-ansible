@@ -4,6 +4,11 @@
     name: ipset
     state: present
 
+- name: Check dig present
+  shell: command -v dig 1>/dev/null 2>&1 && echo yes || echo no
+  changed_when: no
+  register: _dig_installed
+
 - name: Install dig
   become: yes
   package:
@@ -12,6 +17,7 @@
   loop:
     - dnsutils
     - bind-utils
+  when: not _dig_installed.stdout|bool
   ignore_errors: yes
 
 - name: Check NetworkManager installed

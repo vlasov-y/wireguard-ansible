@@ -61,23 +61,24 @@
         _service.changed or
         _settings.changed
 
-- name: "{{ network }} : {{ 'Restart' if _restart_required is defined else 'Start' }} wireguard interface"
+- name: "{{ network }} : Copy service.sh.new to service.sh"
+  become: yes
+  copy:
+    remote_src: yes
+    src: "{{ configuration_path }}/service.sh.new"
+    dest: "{{ configuration_path }}/service.sh"
+    mode: 0755
+    force: yes
+  when: (not _script_old.stat.exists) or
+        (_script_old.stat.checksum != _script_new.checksum)
+
+- name: "{{ network }} : Restart wireguard interface"
   become: yes
   systemd:
     name: "wireguard@{{ network }}.service"
     enabled: yes
-    state: "{{ 're' if _restart_required is defined }}started"
+    state: restarted
     daemon_reload: yes
-  when:
-    - not (_script_old.stat.exists and _script_old.stat.checksum != _script_new.checksum)
-
-- name: "{{ network }} : Restart wireguard interface with script replacement"
-  become: yes
-  shell: |
-    systemctl stop 'wireguard@{{ network }}.service'
-    mv service.sh.new service.sh
-    systemctl enable --now 'wireguard@{{ network }}.service'
-  args:
-    chdir: "{{ configuration_path }}"
-  when:
-    - _script_old.stat.exists and _script_old.stat.checksum != _script_new.checksum
+  when: (not _script_old.stat.exists) or
+        (_script_old.stat.checksum != _script_new.checksum) or
+        (_restart_required | default(false) | bool)
