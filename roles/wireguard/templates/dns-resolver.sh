@@ -1,4 +1,4 @@
-#!/usr/bin env sh
+#!/usr/bin/env sh
 set -e
 
 LIST='{{ configuration_path }}/domains.list'
@@ -7,13 +7,13 @@ IPSETv6='{{ ipset }}-v6'
 INTERVAL='300'
 
 main() {
+  echo "Waiting interval $INTERVAL"
+  wc -l "$LIST" | xargs printf "%d domains total in %s\n"
   create_ipsets
   while true; do
-    flush_ipsets
-    wc -l "$LIST" | xargs printf "%d domains total in %s\n"
-    resolve "$LIST" A "$IPSETv4"
-    resolve "$LIST" AAAA "$IPSETv6"
-    echo "Waiting interval $INTERVAL"
+    flush_ipsets >/dev/null
+    resolve "$LIST" A "$IPSETv4" >/dev/null
+    resolve "$LIST" AAAA "$IPSETv6" >/dev/null
     sleep "$INTERVAL"
   done
 }
@@ -42,8 +42,7 @@ resolve() {
   IPSET="$3"
   TEMP="$(mktemp)"
   # Resolve domains from the list
-  cat "$FILE" | \
-  xargs dig +noall +answer -t "$TYPE" | \
+  < "$FILE" xargs dig +noall +answer -t "$TYPE"  | \
   # Save results to temp file
   tee "$TEMP" | \
   # Select only CNAMEs from first resolution
