@@ -41,10 +41,14 @@ resolve() {
   TYPE="$2"
   IPSET="$3"
   TEMP="$(mktemp)"
+  # Add all IPv4 addresses directly
+  grep -E '[0-9]{1,3}(\.[0-9]{1,3}){3}' "$FILE" | tee "$TEMP"
+  # Filter out IPv4 because they have been already added
+  grep -vE '[0-9]{1,3}(\.[0-9]{1,3}){3}' "$FILE" | \
   # Resolve domains from the list
-  < "$FILE" xargs dig +noall +answer -t "$TYPE"  | \
+  xargs dig +noall +answer -t "$TYPE"  | \
   # Save results to temp file
-  tee "$TEMP" | \
+  tee -a "$TEMP" | \
   # Select only CNAMEs from first resolution
   awk '$4~/^CNAME$/{print $NF}' | sort | uniq | \
   # Resolve CNAMEs
