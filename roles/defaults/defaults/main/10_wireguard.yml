@@ -80,3 +80,6 @@ wireguard_proxy_domains: {}
   #   - vk.com
   #   # fwmark: random # or 2134 or do not specify it
   #   # ipset: myset
+# temporary disable network
+wireguard_disable_networks: []
+# - k3s

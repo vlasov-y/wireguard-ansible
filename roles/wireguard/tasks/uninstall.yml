@@ -1,5 +1,6 @@
 - name: "{{ network }} : Stop wireguard@{{ network }}.service"
   become: yes
+  ignore_errors: yes
   systemd:
     name: "wireguard@{{ network }}.service"
     state: stopped
@@ -8,6 +9,7 @@
 
 - name: "{{ network }} : Stop dns-resolver@{{ network }}.service"
   become: yes
+  ignore_errors: yes
   systemd:
     name: "dns-resolver@{{ network }}.service"
     state: stopped
@@ -17,7 +19,7 @@
 
 - name: "{{ network }} : Remove network files"
   become: yes
+  ignore_errors: yes
   file:
-    path:
-    - "{{ wireguard_configuration_path }}/{{ network }}"
+    path: "{{ wireguard_configuration_path }}/{{ network }}"
     state: absent
