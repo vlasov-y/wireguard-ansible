@@ -15,9 +15,9 @@
   vars:
     yaml:
       port: "{{ port }}"
-      private: "{{ wireguard_keys[network].private }}"
-      public: "{{ wireguard_keys[network].public }}"
-      preshared_key: "{{ wireguard_preshared_key }}"
+      private: "{{ private_key }}"
+      public: "{{ public_key }}"
+      preshared_key: "{{ preshared_key }}"
       fwmark: "{{ fwmark }}"
       rt_table: "{{ rt_table }}"
       ipset: "{{ ipset }}"

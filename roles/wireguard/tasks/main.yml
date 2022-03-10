@@ -1,8 +1,17 @@
 - name: Set fact wireguard_attached_networks
   set_fact:
-    wireguard_attached_networks: "{{ wireguard_addresses.keys() | list }}"
-  
-- when: wireguard_enabled|bool
+    wireguard_attached_networks: "{{ raw | from_yaml | default([]) | list }}"
+  vars:
+    raw: |
+      {% for network, peers in wireguard_addresses.items() %}
+      {% if inventory_hostname in peers.keys() %}
+      - {{ network }}
+      {% endif %}
+      {% endfor %}
+
+- when:
+  - wireguard_enabled|bool
+  - wireguard_attached_networks|length > 0
   block:
     - name: Checks
       include_tasks: checks.yml
@@ -38,6 +47,12 @@
       loop_control:
         loop_var: network
       vars:
+        address: "{{ wireguard_addresses[network][inventory_hostname] }}"
+        netmask: "{{ wireguard_networks[network].split('/')[1] }}"
+        cidr: "{{ address + '/' + netmask }}"
+        private_key: "{{ wireguard_keys[network][inventory_hostname].private }}"
+        public_key: "{{ wireguard_keys[network][inventory_hostname].public }}"
+        preshared_key: "{{ wireguard_preshared_keys[network] }}"
         configuration_path: "{{ wireguard_configuration_path }}/{{ network }}"
         interface: "{{ wireguard_interfaces[network] }}"
         port: "{{ wireguard_ports[network] | int }}"

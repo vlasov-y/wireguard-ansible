@@ -2,8 +2,9 @@
   include_tasks: firewalld.yml
   when: _firewalld_enabled.stdout|bool
 
-- name: "{{ network }} : Create keys"
-  include_tasks: keys.yml
+- name: "{{ network }} : Print public keys"
+  debug:
+    msg: "{{ public_key }}"
 
 - name: "{{ network }} : Add route table"
   become: yes

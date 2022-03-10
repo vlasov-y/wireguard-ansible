@@ -16,35 +16,36 @@ wireguard_networks: {}
 # ports to listen on
 wireguard_ports: {}
   # k3s: 12345
-# force these keys
-wireguard_keys: {}
-  # k3s:
-  #   private: 'CFzvKwI2s0v7y72k8Btup+cryb8vuJcR9MFo10naH10='
-  #   public: 'bIMrAKJrQv5wCCB5y5Y5L3L6jNOTyXQ1TXfoefRRZgM='
-# list of preshared_key - you can set additional preshared key
-wireguard_preshared_key: ""
-# force regenerate keys
-wireguard_regenerate_keys: []
-  # - k3s
+# list of preshared_keys - you can set additional preshared keys per network
+wireguard_preshared_keys: {}
+  # bzm: ...
+  # k3s: ...
 # will be applied to all peers by default (if set)
 wireguard_default_keepalive_seconds: no
 # list of peers
 wireguard_peers: {}
   # k3s:
-  #   manual:
-  #     - public_key: ...
-  #       preshared_key: base64string
-  #       keepalive_seconds: 0 # for disable
-  #       allowed_ips:
-  #         - 0.0.0.0/0
-  #         - ::0
-  #       endpoint: ep.com
-  #   inventory:
-  #     - hostname: ...
-  #       endpoint: ep.com:1234
+  #   - name: host1
+  #     keepalive_seconds: 0 # for disable
+  #     allowed_ips:
+  #       - 0.0.0.0/0
+  #       - ::0
+  #     endpoint: ep.com
+  #   - name: host3
+  #     endpoint: ep.com:1234
 # list of addresses for the interface
 wireguard_addresses: {}
-  # k3s: 10.0.0.1/24
+  # k3s:
+  #   host1: 10.10.10.1
+  #   host3: 10.10.10.250
+wireguard_keys: {}
+  # k3s:
+  #   host1:
+  #     private: ...
+  #     public: ...
+  #   host3:
+  #     private: ...
+  #     public: ...
 # optional override list for interfaces
 wireguard_interfaces: {}
   # k3s: wgcutom0

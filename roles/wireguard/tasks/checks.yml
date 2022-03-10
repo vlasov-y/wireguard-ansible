@@ -13,14 +13,6 @@
     msg: "No addresses defined"
   when: wireguard_addresses is not defined or not wireguard_addresses
 
-- name: Check unknown networks in wireguard_regenerate_keys
-  fail:
-    msg: "Unknown network {{ network }} in wireguard_regenerate_keys"
-  loop: "{{ wireguard_regenerate_keys }}"
-  loop_control:
-    loop_var: network
-  when: network not in wireguard_networks.keys()
-
 - name: Check unknown networks in wireguard_peers
   fail:
     msg: "Unknown network {{ network }} in wireguard_peers"
@@ -47,72 +39,25 @@
 
 - name: Check address subnet
   fail:
-    msg: "Address {{ address }} does not belong to subnet {{ subnet }}"
-  loop: "{{ wireguard_addresses | dict2items }}"
+    msg: |
+      Address {{ address }} does not belong to subnet {{ subnet }}
+      of network {{ network }} for host {{ inventory_hostname }}
+  loop: "{{ wireguard_attached_networks }}"
   loop_control:
+    loop_var: network
     label: "{{ network }} > {{ address }}"
   vars:
-    network: "{{ item.key }}"
-    address: "{{ item.value }}"
+    address: "{{ wireguard_addresses[network][inventory_hostname] }}"
     subnet: "{{ wireguard_networks[network] }}"
   when: not address | ipaddr(subnet)
 
 - name: Check address duplicates
   fail:
-    msg: "Address {{ address }} is also assigned to another host in the network {{ network }}"
-  loop: "{{ wireguard_addresses | dict2items }}"
+    msg: "Duplicate addresses for {{ network }} are defined in wireguard_addresses"
+  loop: "{{ wireguard_attached_networks }}"
   loop_control:
-    label: "{{ network }} > {{ address }}"
-  vars:
-    network: "{{ item.key }}"
-    address: "{{ item.value }}"
-    query: "*|[?inventory_hostname!=`{{ inventory_hostname }}`].wireguard_addresses.{{ network }}"
-  when: address in hostvars | json_query(query)
-
-- name: Check inventory peers connections
-  fail:
-    msg: "{{ check | from_yaml }}"
-  loop: "{{ wireguard_peers | dict2items }}"
-  loop_control:
-    label: "{{ network }}"
-  vars:
-    network: "{{ item.key }}"
-    peers: "{{ item.value | json_query('not_null(inventory, `[]`)[*].hostname') | default([]) }}"
-    check: |
-      {% set query = 'not_null(wireguard_peers.'+network+'.not_null(inventory, `[]`)[*].hostname, `[]`)' %}
-      {% set errors = [] %}
-      {% for host in peers %}
-      {% if inventory_hostname not in hostvars[host] | json_query(query) %}
-      {{ errors.append('Peer ' + host + ' does not have ' + inventory_hostname + ' in inventory peers') }}
-      {% endif %}
-      {% endfor %}
-      {{ errors | list | to_yaml }}
-  when: check | from_yaml
-
-- name: Check manual peers
-  fail:
-    msg: "{{ check | from_yaml }}"
-  loop: "{{ wireguard_peers | dict2items }}"
-  loop_control:
-    label: "{{ network }}"
-  vars:
-    network: "{{ item.key }}"
-    peers: "{{ item.value | json_query('not_null(manual, `[]`)') }}"
-    check: |
-      {% set errors = [] %}
-      {% for peer in peers %}
-      {% if peer.endpoint is defined and peer.endpoint is not match(':[0-9]+$') %}
-        {{ errors.append('Peer ' + peer + ' in the networks ' + network + ' does not have endpoint port specified') }}
-      {% elif peer.public_key is not defined %}
-        {{ errors.append('Peer ' + peer + ' in the networks ' + network + ' does not have public_key defined') }}
-      {% elif peer.allowed_ips is not defined %}
-        {{ errors.append('Peer ' + peer + ' in the networks ' + network + ' does not have allowed_ips defined') }}
-      {% elif peer.preshared_key is not defined %}
-        {{ errors.append('Peer ' + peer + ' in the networks ' + network + ' does not have preshared_key defined') }}
-      {% endif %}
-      {% endfor %}
-      {{ errors | list | to_yaml }}
-  when: check | from_yaml
+    loop_var: network
+  when: wireguard_addresses[network].values()|unique|length != wireguard_addresses[network].keys()|length
 
 - name: Check wireguard_ports
   fail:
@@ -159,13 +104,12 @@
 - name: Check wireguard_keys
   fail:
     msg: "Wireguard keys for network {{ network }} are not set properly"
-  loop: "{{ wireguard_keys | dict2items }}"
+  loop: "{{ wireguard_attached_networks }}"
   loop_control:
-    label: "{{ network }}"
+    loop_var: network
   vars:
-    network: "{{ item.key }}"
-    public: "{{ item.value.public | default(None) }}"
-    private: "{{ item.value.private | default(None) }}"
+    public: "{{ wireguard_keys[network][inventory_hostname].public | default(None) }}"
+    private: "{{ wireguard_keys[network][inventory_hostname].private | default(None) }}"
   when: not public or not private
 
 - name: Check wireguard_rt_tables

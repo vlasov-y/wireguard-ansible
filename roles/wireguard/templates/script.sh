@@ -3,9 +3,9 @@
 set -ex
 
 IF='{{ interface }}'
-ADDR='{{ wireguard_addresses[network].split("/")[0] }}'
-CIDR='{{ wireguard_addresses[network].split("/")[1] }}'
-FULL_ADDR="${ADDR}/${CIDR}"
+ADDR='{{ address }}'
+NETMASK='{{ netmask }}'
+CIDR='{{ cidr }}'
 NETWORK='{{ wireguard_networks[network] }}'
 CONFIG='{{ configuration_path }}/wireguard.conf'
 FWMARK='{{ fwmark }}'
@@ -92,8 +92,8 @@ start_interface() {
     ip link add dev "$IF" type wireguard
   fi
   # assign IP address to that device
-  if ! ip addr show dev "$IF" | grep -qF "$FULL_ADDR"; then
-    ip addr add dev "$IF" "$FULL_ADDR"
+  if ! ip addr show dev "$IF" | grep -qF "$CIDR"; then
+    ip addr add dev "$IF" "$CIDR"
   fi
   # load wireguard.conf for this device
   wg setconf "$IF" "$CONFIG"

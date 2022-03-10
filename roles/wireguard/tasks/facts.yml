@@ -40,7 +40,7 @@
   until: _ is succeeded
   register: _
 
-- name: Select random fwmarks for dnsmasq
+- name: Select random fwmarks for proxy_domains
   set_fact:
     wireguard_proxy_domains: "{{ wireguard_proxy_domains | combine({network: {'fwmark': fwmark}}) }}"
   loop: "{{ wireguard_attached_networks }}"
@@ -70,7 +70,7 @@
   vars:
     fwmark: "{{ '%#x' % wireguard_fwmarks[network]|int }}"
 
-- name: Convert dnsmasq fwmarks to hex
+- name: Convert proxy fwmarks to hex
   set_fact:
     wireguard_proxy_domains: "{{ wireguard_proxy_domains | combine({network: {'fwmark': fwmark}}, recursive=True) }}"
   loop: "{{ wireguard_attached_networks }}"
@@ -139,25 +139,3 @@
     - network in wireguard_proxy_domains
     - (wireguard_proxy_domains[network].ipset is not defined) or
       (not wireguard_proxy_domains[network].ipset)
-
-- name: Set force_bash_resolver in wireguard_proxy_domains
-  set_fact:
-    wireguard_proxy_domains: "{{ wireguard_proxy_domains | combine({network: {'force_bash_resolver': False}}, recursive=True) }}"
-  loop: "{{ wireguard_attached_networks }}"
-  loop_control:
-    loop_var: network
-  vars:
-    name: "{{ wireguard_interfaces[network] }}"
-  when:
-    - network in wireguard_proxy_domains
-    - wireguard_proxy_domains[network].force_bash_resolver is not defined
-
-- name: Force keys regeneration if they are empty (from config file)
-  set_fact:
-    wireguard_regenerate_keys: "{{ ((wireguard_regenerate_keys | default(list)) + [network]) | unique }}"
-  loop: "{{ wireguard_attached_networks }}"
-  loop_control:
-    loop_var: network
-  when: (network not in wireguard_keys) or
-        (not wireguard_keys[network].public) or
-        (not wireguard_keys[network].private)

@@ -20,55 +20,41 @@
   when: not _dig_installed.stdout|bool
   ignore_errors: yes
 
-- name: Check NetworkManager installed
+- name: "{{ network }} : Template DNS resolver script"
   become: yes
-  shell: NetworkManager -V 1>/dev/null && echo yes || echo no
-  changed_when: no
-  register: _check
+  template:
+    src: dns-resolver.sh
+    dest: "{{ configuration_path }}/dns-resolver.sh"
+    mode: 0755
+  register: _dns_resolver
 
-- name: Configure NetworkManager
-  include_tasks: network_manager.yml
-  when:
-    -  _check.stdout|bool
-    - not wireguard_proxy_domains[network].force_bash_resolver|bool
+- name: "{{ network }} : Generate systemd service"
+  become: yes
+  template:
+    src: dns-resolver-service.ini
+    dest: "/lib/systemd/system/dns-resolver@.service"
+    mode: 0644
+  register: _dns_resolver_service
 
-- when: not _check.stdout|bool or wireguard_proxy_domains[network].force_bash_resolver|bool
-  block:
-    - name: "{{ network }} : Template DNS resolver script"
-      become: yes
-      template:
-        src: dns-resolver.sh
-        dest: "{{ configuration_path }}/dns-resolver.sh"
-        mode: 0755
-      register: _dns_resolver
+- name: "{{ network }} : Template DNS list"
+  become: yes
+  copy:
+    content: |
+      {% for domain in wireguard_proxy_domains[network].list %}
+      {{ domain }}
+      {% endfor %}
+    dest: "{{ configuration_path }}/domains.list"
+    mode: 0644
+  register: _dns_list
 
-    - name: "{{ network }} : Generate systemd service"
-      become: yes
-      template:
-        src: dns-resolver-service.ini
-        dest: "/lib/systemd/system/dns-resolver@.service"
-        mode: 0644
-      register: _dns_resolver_service
+- name: "{{ network }} : Set fact _restart_required"
+  set_fact:
+    _restart_required: "{{ _dns_resolver.changed or _dns_resolver_service.changed or _dns_list.changed }}"
 
-    - name: "{{ network }} : Template DNS list"
-      become: yes
-      copy:
-        content: |
-          {% for domain in wireguard_proxy_domains[network].list %}
-          {{ domain }}
-          {% endfor %}
-        dest: "{{ configuration_path }}/domains.list"
-        mode: 0644
-      register: _dns_list
-
-    - name: "{{ network }} : Set fact _restart_required"
-      set_fact:
-        _restart_required: "{{ _dns_resolver.changed or _dns_resolver_service.changed or _dns_list.changed }}"
-
-    - name: "{{ network }} : {{ 'Restart' if _restart_required|bool else 'Start' }} DNS resolver"
-      become: yes
-      systemd:
-        name: "dns-resolver@{{ network }}.service"
-        enabled: yes
-        state: "{{ 're' if _restart_required|bool }}started"
-        daemon_reload: yes
+- name: "{{ network }} : {{ 'Restart' if _restart_required|bool else 'Start' }} DNS resolver"
+  become: yes
+  systemd:
+    name: "dns-resolver@{{ network }}.service"
+    enabled: yes
+    state: "{{ 're' if _restart_required|bool }}started"
+    daemon_reload: yes
