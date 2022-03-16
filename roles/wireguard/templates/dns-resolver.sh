@@ -12,8 +12,8 @@ main() {
   create_ipsets
   while true; do
     flush_ipsets >/dev/null
-    resolve "$LIST" A "$IPSETv4" >/dev/null
-    resolve "$LIST" AAAA "$IPSETv6" >/dev/null
+    resolve "$LIST" A "$IPSETv4"
+    resolve "$LIST" AAAA "$IPSETv6"
     sleep "$INTERVAL"
   done
 }
@@ -40,7 +40,8 @@ resolve() {
   FILE="$1"
   TYPE="$2"
   IPSET="$3"
-  TEMP="$(mktemp)"
+  TEMP="/tmp/dns-resolver@{{ network }}.txt"
+  touch "$TEMP"
   # Add all IPv4 addresses directly
   grep -E '[0-9]{1,3}(\.[0-9]{1,3}){3}' "$FILE" | tee "$TEMP"
   # Filter out IPv4 because they have been already added
@@ -61,8 +62,9 @@ resolve() {
   # Add all addresses to the ipset
   awk "\$4~/^$TYPE\$/{print \$NF}" "$TEMP" | \
   # Filter out resereved
-  grep -vE '^(::1|::0|127.0.0.[0-9]+)$' |\
-  xargs -I{} ipset add "$IPSET" {} -exist
+  grep -vE '^(::1|::0|127\.0\.0\.[0-9]+|::|0\.0\.0\.0)$' | \
+  xargs -I{} ipset add "$IPSET" {} -exist || \
+  echo "IPset processing have failed!"
   # Remove temp file
   rm -f "$TEMP"
 }
