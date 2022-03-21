@@ -1,0 +1,19 @@
+all:
+  hosts:
+    public_host:
+      # public IP that we can reach home server once
+      # after the first setup, IP have to be changed
+      # to 192.168.99.1 and do not forget to hide
+      # ssh server on the public_host from outer world
+      ansible_host: my-vpn.example.com
+      ansible_port: 21234
+      ansible_become_password: longalphanum
+    laptop:
+      ansible_connection: local
+    home:
+      # local IP that we can reach home server once
+      # after the first setup, IP have to be changed
+      # to 192.168.99.3
+      ansible_host: 192.168.1.10
+      ansible_port: 22343
+      ansible_become_password: longalphanum

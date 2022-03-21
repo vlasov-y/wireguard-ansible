@@ -1,0 +1,16 @@
+wireguard_enabled: yes
+wireguard_install_tools: no
+wireguard_peers:
+  home:
+  - name: laptop
+  - name: home_server
+    keepalive_seconds: 25
+  vpn:
+  - name: laptop
+  - name: smartphone
+wireguard_ports:
+  home: 2000
+  vpn: 3000
+wireguard_masquarade:
+  vpn: auto
+

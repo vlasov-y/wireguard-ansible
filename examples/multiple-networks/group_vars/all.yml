@@ -1,0 +1,39 @@
+wireguard_networks:
+  home: 192.168.99.0/24
+  vpn: 10.0.0.0/24
+wireguard_fwmarks:
+  home: 1000
+  vpn: 2000
+wireguard_preshared_keys:
+  home: longalphanum
+  vpn: longalphanum
+wireguard_keys:
+  home:
+    public_host:
+      public: longalphanum
+      private: longalphanum
+    home_server:
+      public: longalphanum
+      private: longalphanum
+    laptop:
+      public: longalphanum
+      private: longalphanum
+  vpn:
+    public_host:
+      public: longalphanum
+      private: longalphanum
+    laptop:
+      public: longalphanum
+      private: longalphanum
+    smartphone:
+      public: longalphanum
+wireguard_addresses:
+  home:
+    public_host: 192.168.99.1
+    laptop: 192.168.99.2
+    home_server: 192.168.99.3
+  vpn:
+    public_host: 10.0.0.1
+    laptop: 10.0.0.2
+    smartphone: 10.0.0.3
+

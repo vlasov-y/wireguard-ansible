@@ -1,0 +1,9 @@
+wireguard_enabled: yes
+wireguard_peers:
+  home:
+  - name: public_host
+    endpoint: my-vpn.example.com
+    allowed_ips:
+    - "{{ wireguard_networks.home }}"
+    keepalive_seconds: 25
+

@@ -4,3 +4,4 @@ host_vars
 dist
 ansible.log
 inventory.yml
+!examples/**
