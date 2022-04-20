@@ -83,3 +83,7 @@ wireguard_proxy_domains: {}
 # temporary disable network
 wireguard_disable_networks: []
 # - k3s
+
+# if netns is enabled, then wireguard_proxy_domains is ignored
+wireguard_netns: []
+# - k3s

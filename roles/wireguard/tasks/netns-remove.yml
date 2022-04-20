@@ -1,0 +1,5 @@
+- name: "{{ network }} : Remove netns script"
+  become: yes
+  file:
+    path: "/usr/local/bin/{{ netns_name }}"
+    state: absent

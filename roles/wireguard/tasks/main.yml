@@ -59,7 +59,10 @@
         fwmark: "{{ wireguard_fwmarks[network] }}"
         peers: "{{ wireguard_peers[network] }}"
         rt_table: "{{ wireguard_rt_tables[network] }}"
-        ipset: "{{ wireguard_proxy_domains[network].ipset | default(None) }}"
+        netns_enabled: "{{ network in wireguard_netns }}"
+        netns_name: "wg-{{ network }}"
+        proxy_enabled: "{{ network in wireguard_proxy_domains and network not in wireguard_netns }}"
+        proxy_ipset: "{{ wireguard_proxy_domains[network].ipset | default(None) }}"
         proxy_fwmark: "{{ wireguard_proxy_domains[network].fwmark | default(None) }}"
       when: network not in wireguard_disable_networks
     
@@ -69,8 +72,6 @@
       loop_control:
         loop_var: network
       when: network in wireguard_attached_networks
-
-
 
 - name: Uninstall wireguard
   include_tasks: uninstall.yml

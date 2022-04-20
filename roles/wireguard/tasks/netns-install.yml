@@ -1,0 +1,31 @@
+- name: "{{ network }} : Create netns script"
+  become: yes
+  template:
+    src: netns.sh
+    dest: "/usr/local/bin/{{ netns_name }}"
+    mode: 0755
+
+
+- name: "{{ network }} : Create netns etc folder"
+  become: yes
+  file:
+    state: directory
+    path: "/etc/netns/{{ netns_name }}"
+    owner: root
+    group: root
+    mode: 0755
+    recurse: yes
+
+- name: "{{ network }} : Create netns etc folder"
+  become: yes
+  copy:
+    dest: "/etc/netns/{{ netns_name }}/resolv.conf"
+    content: |
+      nameserver 1.1.1.1
+      nameserver 1.0.0.1
+      nameserver 8.8.8.8
+      nameserver 8.8.4.4
+    owner: root
+    group: root
+    mode: 0644
+

@@ -2,6 +2,9 @@
 #!/usr/bin/env sh
 set -ex
 
+IP_BIN="$(command -v ip | tr -d '[:space:]')"
+IPTABLES_BIN="$(command -v iptables | tr -d '[:space:]')"
+WG_BIN="$(command -v wg | tr -d '[:space:]')"
 IF='{{ interface }}'
 ADDR='{{ address }}'
 NETMASK='{{ netmask }}'
@@ -12,11 +15,12 @@ FWMARK='{{ fwmark }}'
 RT_NAME='{{ rt_table.name }}'
 RT_ID='{{ rt_table.id }}'
 # interface that is used in default route
-GW_IF="$(awk '$2 == 00000000 { print $1 }' /proc/net/route)"
-{%- if network in wireguard_proxy_domains %}
-PROXY_IPSET_v4='{{ ipset }}-v4'
-PROXY_IPSET_v6='{{ ipset }}-v6'
+{%- if proxy_enabled|bool %}
+PROXY_IPSET_v4='{{ proxy_ipset }}-v4'
+PROXY_IPSET_v6='{{ proxy_ipset }}-v6'
 PROXY_FWMARK='{{ proxy_fwmark }}'
+{%- elif netns_enabled|bool %}
+NETNS='{{ netns_name }}'
 {%- endif %}
 
 # entrypoint
@@ -25,20 +29,47 @@ main() {
     # executed on systemctl start
     {{ 'prestart' if wireguard_extra_config|json_query(network + '.prestart') }}
     start_interface
-    {{ 'enable_proxy' if network in wireguard_proxy_domains }}
+    {{ 'enable_proxy' if proxy_enabled|bool }}
     {{ 'enable_masquarade' if network in wireguard_masquarade }}
     {{ 'poststart' if wireguard_extra_config|json_query(network + '.poststart') }}
   elif [ "$1" = 'stop' ]; then
     # executed on systemctl stop
     {{ 'prestop' if wireguard_extra_config|json_query(network + '.prestop') }}
     stop_interface
-    {{ 'disable_proxy' if network in wireguard_proxy_domains }}
+    {{ 'disable_proxy' if proxy_enabled|bool }}
     {{ 'disable_masquarade' if network in wireguard_masquarade }}
     {{ 'poststop' if wireguard_extra_config|json_query(network + '.poststop') }}
   else
     # in case if you launched this script manually with improper args
     echo "error: unknown action $1" >&2
     exit 1
+  fi
+}
+
+# wrapper with netns specification
+ip() {
+  if [ -n "$NETNS" ]; then
+    "$IP_BIN" -n "$NETNS" "$@"
+  else
+    "$IP_BIN" "$@"
+  fi
+}
+
+# wrapper with netns specification
+iptables() {
+  if [ -n "$NETNS" ]; then
+    "$IP_BIN" netns exec "$NETNS" "$IPTABLES_BIN" "$@"
+  else
+    "$IPTABLES_BIN" "$@"
+  fi
+}
+
+# wrapper with netns specification
+wg() {
+  if [ -n "$NETNS" ]; then
+    "$IP_BIN" netns exec "$NETNS" "$WG_BIN" "$@"
+  else
+    "$WG_BIN" "$@"
   fi
 }
 
@@ -87,9 +118,17 @@ _ipset() {
 
 # launchs wireguard interface itself
 start_interface() {
-  # create device
-  if ! ip link show type wireguard | awk -F: '/:/{print $2}' | grep -qF "${IF}"; then
-    ip link add dev "$IF" type wireguard
+  # create netns
+  if [ -n "$NETNS" ] && ! "$IP_BIN" netns list | grep -qF "$NETNS"; then
+    "$IP_BIN" netns add "$NETNS"
+  fi
+  # maybe iface is present in root netns, then we have to skip creation
+  if ! "$IP_BIN" link show type wireguard | awk -F: '/:/{print $2}' | grep -qF "$IF"; then
+    "$IP_BIN" link add dev "$IF" type wireguard
+  fi
+  # move to netns
+  if [ -n "$NETNS" ] && ! ip link show type wireguard | awk -F: '/:/{print $2}' | grep -qF "$IF" ; then
+    "$IP_BIN" link set "$IF" netns "$NETNS"
   fi
   # assign IP address to that device
   if ! ip addr show dev "$IF" | grep -qF "$CIDR"; then
@@ -98,12 +137,17 @@ start_interface() {
   # load wireguard.conf for this device
   wg setconf "$IF" "$CONFIG"
   # ifup wg interface
+  ip link set up lo
   ip link set up "$IF"
   # add route to wireguard network from main table
-  _iproute add "$NETWORK" dev "$IF" src "$ADDR" table main
+  if [ -n "$NETNS" ]; then
+    _iproute add default dev "$IF" src "$ADDR" table main
+  else
+    _iproute add "$NETWORK" dev "$IF" src "$ADDR" table main
+  fi
   # add default route to wireguard's route table
   _iproute add default dev "$IF" src "$ADDR" table "$RT_NAME"
-  # packets from wireguard interface should be routed from main table
+    # packets from wireguard interface should be routed from main table
   _iprule add fwmark "$FWMARK" table main
   # enable masquarade for outgoing connection
   iptables -t nat -I POSTROUTING -o "$IF" -j MASQUERADE
@@ -117,10 +161,14 @@ stop_interface() {
   _iproute del "$NETWORK" dev "$IF" src "$ADDR" table main
   # remove route from wireguard's table
   _iproute del default dev "$IF" src "$ADDR" table "$RT_NAME"
-  # remove rule for wiregaurd fwmark from main
+  # packets from wireguard interface should be routed from main table
   _iprule del fwmark "$FWMARK" table main
   # delete device
   ip link del dev "$IF"
+  # remove netns
+  if [ -n "$NETNS" ]; then
+    "$IP_BIN" netns delete "$NETNS" || true
+  fi
 }
 {{''}}
 {%- if network in wireguard_masquarade %}
@@ -137,7 +185,7 @@ disable_masquarade() {
 }
 {%- endif %}
 {{''}}
-{%- if network in wireguard_proxy_domains %}
+{%- if proxy_enabled|bool %}
 # enables domain-based proxying over wireguard
 enable_proxy() {
   # create ipset for dnsmasq

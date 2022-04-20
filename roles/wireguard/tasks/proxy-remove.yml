@@ -1,0 +1,29 @@
+- name: "{{ network }} : Stop DNS resolver"
+  become: yes
+  ignore_errors: yes
+  systemd:
+    name: "dns-resolver@{{ network }}.service"
+    enabled: no
+    state: "stopped"
+    daemon_reload: no
+
+- name: "{{ network }}: Remove DNS resolver files"
+  become: yes
+  file:
+    path:
+    - "{{ configuration_path }}/domains.list"
+    - "{{ configuration_path }}/dns-resolver.sh"
+    - /lib/systemd/system/dns-resolver@.service
+    state: absent
+
+- name: "{{ network }}: List ipsets"
+  become: yes
+  shell: "ipset list | awk '/^Name: wg-{{ network }}-v[46]/{print $2}'"
+  changed_when: no
+  register: _ipsets
+
+- name: "{{ network }}: Remove ipsets"
+  become: yes
+  shell: "ipset destroy {{ item }}"
+  loop: "{{ _ipsets.stdout_lines }}"
+  

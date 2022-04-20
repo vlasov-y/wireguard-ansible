@@ -14,8 +14,28 @@
     block: "{{ rt_table.id }}    {{ rt_table.name }}"
 
 - name: "{{ network }} : Save configuration"
-  include_tasks: config_save.yml
+  include_tasks: config-save.yml
 
-- name: "{{ network }} : Proxy domains configuration"
-  include_tasks: proxy.yml
-  when: network in wireguard_proxy_domains
+#  ┬─┐┬─┐┌─┐┐ │┐ ┬
+#  │─┘│┬┘│ │┌┼┘└┌┘
+#  ┘  ┘└┘┘─┘┘ └ ┘ 
+
+- name: "{{ network }} : Proxy domains install"
+  include_tasks: proxy-install.yml
+  when: proxy_enabled|bool
+
+- name: "{{ network }} : Proxy domains removal"
+  include_tasks: proxy-remove.yml
+  when: not proxy_enabled|bool
+
+#  ┌┐┐┬─┐┌┐┐┌┐┐┐─┐
+#  │││├─  │ │││└─┐
+#  ┘└┘┴─┘ ┘ ┘└┘──┘
+
+- name: "{{ network }} : Netns install"
+  include_tasks: netns-install.yml
+  when: netns_enabled|bool
+
+- name: "{{ network }} : Netns removal"
+  include_tasks: netns-remove.yml
+  when: not netns_enabled|bool

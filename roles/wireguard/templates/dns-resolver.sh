@@ -2,20 +2,28 @@
 set -e
 
 LIST='{{ configuration_path }}/domains.list'
-IPSETv4='{{ ipset }}-v4'
-IPSETv6='{{ ipset }}-v6'
+IPSETv4='{{ proxy_ipset }}-v4'
+IPSETv6='{{ proxy_ipset }}-v6'
 INTERVAL='300'
 
 main() {
-  echo "Waiting interval $INTERVAL"
-  wc -l "$LIST" | xargs printf "%d domains total in %s\n"
-  create_ipsets
-  while true; do
-    flush_ipsets >/dev/null
-    resolve "$LIST" A "$IPSETv4"
-    resolve "$LIST" AAAA "$IPSETv6"
-    sleep "$INTERVAL"
-  done
+  if [ "$1" = 'start' ]; then
+    echo "Waiting interval $INTERVAL"
+    wc -l "$LIST" | xargs printf "%d domains total in %s\n"
+    create_ipsets
+    while true; do
+      flush_ipsets >/dev/null
+      resolve "$LIST" A "$IPSETv4"
+      resolve "$LIST" AAAA "$IPSETv6"
+      sleep "$INTERVAL"
+    done
+  elif [ "$1" = 'stop' ]; then
+    destroy_ipsets
+  else
+    # in case if you launched this script manually with improper args
+    echo "error: unknown action $1" >&2
+    exit 1
+  fi
 }
 
 create_ipsets() {
@@ -26,6 +34,17 @@ create_ipsets() {
   if ! ipset list "$IPSETv6" 1>/dev/null 2>&1; then
     echo "Creating $IPSETv6"
     ipset create "$IPSETv6" hash:ip family inet6
+  fi
+}
+
+destroy_ipsets() {
+  if ipset list "$IPSETv4" 1>/dev/null 2>&1; then
+    echo "Destroying $IPSETv4"
+    ipset destroy "$IPSETv4"
+  fi
+  if ipset list "$IPSETv6" 1>/dev/null 2>&1; then
+    echo "Destroying $IPSETv6"
+    ipset destroy "$IPSETv6"
   fi
 }
 

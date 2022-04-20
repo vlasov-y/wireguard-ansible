@@ -20,7 +20,7 @@
       preshared_key: "{{ preshared_key }}"
       fwmark: "{{ fwmark }}"
       rt_table: "{{ rt_table }}"
-      ipset: "{{ ipset }}"
+      proxy_ipset: "{{ proxy_ipset }}"
       proxy_fwmark: "{{ proxy_fwmark }}"
 
 - name: "{{ network }} : Generate wireguard config"

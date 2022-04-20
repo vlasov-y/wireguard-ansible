@@ -1,5 +1,5 @@
 - name: Read existing configs
-  include_tasks: config_load.yml
+  include_tasks: config-load.yml
   loop: "{{ wireguard_attached_networks }}"
   loop_control:
     loop_var: network
